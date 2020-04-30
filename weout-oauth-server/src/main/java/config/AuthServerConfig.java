@@ -24,7 +24,7 @@ public class AuthServerConfig extends AuthorizationServerConfigurerAdapter {
         clients.inMemory()
                 .withClient("MycomplicateClietnId")
                 .secret(passwordEncoder.encode("myVeryComplexP@ss"))
-                .authorizedGrantTypes("authorization_code","access_token", "refresh_token")
+                .authorizedGrantTypes("authorization_code")
                 .scopes("user_info")
                 .autoApprove(true)
                 .redirectUris("http://locahost:8082/ui/login");
