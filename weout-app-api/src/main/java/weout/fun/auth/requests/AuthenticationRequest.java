@@ -1,4 +1,4 @@
-package weout.fun.models;
+package weout.fun.auth.requests;
 
 public class AuthenticationRequest {
     private String username;

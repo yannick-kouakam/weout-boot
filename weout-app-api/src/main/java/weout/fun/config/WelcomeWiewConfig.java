@@ -1,4 +1,4 @@
-package weout.fun.api.config.web;
+package weout.fun.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

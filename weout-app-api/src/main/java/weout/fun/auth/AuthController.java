@@ -1,45 +1,48 @@
-package weout.fun;
+package weout.fun.auth;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import weout.fun.config.filter.JwtTokenProvider;
-import weout.fun.models.AuthenticationRequest;
+import weout.fun.auth.requests.AuthenticationRequest;
+import weout.fun.auth.responses.AuthenticationResponse;
+import weout.fun.auth.services.AuthenticationService;
+import weout.fun.config.auth.filter.JwtTokenProvider;
 import weout.fun.user.UserService;
-
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
   private final JwtTokenProvider jwtTokenProvider;
-  private final AuthenticationManager authenticationManager;
   private final UserService userService;
+  private AuthenticationService authenticationService;
 
   @Autowired
   public AuthController(
       JwtTokenProvider jwtTokenProvider,
       AuthenticationManager authenticationManager,
-      UserService userService) {
+      UserService userService,
+      AuthenticationService authenticationService) {
     this.jwtTokenProvider = jwtTokenProvider;
-    this.authenticationManager = authenticationManager;
     this.userService = userService;
+    this.authenticationService = authenticationService;
   }
 
   @PostMapping("/signin")
-  public ResponseEntity signin(@RequestBody AuthenticationRequest auth) {
-    var userDetails = userService.loadUserByUsername(auth.getUsername());
-    authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(auth.getUsername(), auth.getPassword()));
-    var result = new HashMap<>();
-    result.put("username", userDetails.getUsername());
-    String token = jwtTokenProvider.createToken(auth.getUsername());
-    result.put("token", token);
-    return ResponseEntity.ok(result);
+  public AuthenticationResponse signin(@RequestBody AuthenticationRequest auth) {
+//    var userDetails = userService.loadUserByUsername(auth.getUsername());
+//    if (userDetails == null) {
+//      throw new UsernameNotFoundException(
+//          String.format("User with username %s not found", auth.getUsername()));
+//    }
+
+    authenticationService.authenticate(auth);
+
+    String token = jwtTokenProvider.createAccessToken(auth.getUsername());
+    String refresToken = jwtTokenProvider.createRefreshToken(auth.getUsername());
+    return new AuthenticationResponse(token, refresToken);
   }
 }

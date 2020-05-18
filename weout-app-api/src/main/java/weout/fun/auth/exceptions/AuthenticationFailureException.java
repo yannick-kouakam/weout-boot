@@ -1,12 +1,20 @@
 package weout.fun.auth.exceptions;
 
-import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
+import lombok.Getter;
+import org.springframework.security.core.AuthenticationException;
 
-public class AuthenticationException extends AbstractAuthenticationFailureEvent {
-  private final int statusCode = 403;
-  private String message;
+@Getter
+public class AuthenticationFailureException extends AuthenticationException {
+  private final int statusCode ;
 
-  public AuthenticationException(String message) {
-    this.message = message;
+  public AuthenticationFailureException(String message) {
+    super(message);
+    statusCode = 401;
   }
+
+  public AuthenticationFailureException(String message, int statusCode){
+    super(message);
+    this.statusCode = statusCode;
+  }
+
 }

@@ -1,4 +1,4 @@
-package weout.fun.config.filter;
+package weout.fun.config.auth.filter;
 
 import io.jsonwebtoken.*;
 import org.slf4j.Logger;
@@ -6,18 +6,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
+import weout.fun.auth.exceptions.AuthenticationFailureException;
 import weout.fun.user.UserService;
 
-import javax.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
   private final byte[] key = "tres_compliacte_key".getBytes();
-  private final long ACCESS_TOKEN_EXPIRY_TIME = 7 * 24 * 60 * 60;
-  private final long REFRESH_TOKEN_EXPIRY_TIME = 30 * 24 * 60 * 60;
+
+  private final long ACCESS_TOKEN_EXPIRY_TIME = 7 * 24 * 3600L;
+
+  private final long REFRESH_TOKEN_EXPIRY_TIME = 30 * 24 * 3600L;
+
   private Logger logger = LoggerFactory.getLogger(getClass());
+
   private UserService userService;
 
   @Autowired
@@ -30,47 +34,42 @@ public class JwtTokenProvider {
     return creatToken(username, ACCESS_TOKEN_EXPIRY_TIME);
   }
 
-  private String creatToken(String username, long expirenIn) {
-    return Jwts.builder()
-        .signWith(SignatureAlgorithm.HS256, key)
-        .setIssuedAt(Date.from(Instant.now()))
-        .setExpiration(Date.from(Instant.now().plusSeconds(expirenIn)))
-        .setIssuer("weout-api")
-        .setAudience("weout-app")
-        .setHeaderParam("type", "JWT")
-        .setSubject(username)
-        .compact();
+  public UsernamePasswordAuthenticationToken resolveToken(String token)
+      throws AuthenticationFailureException {
+    // get token claims
+    Claims claim = getClaims(token);
+
+    // check token validity
+    isValid(claim.getExpiration());
+    // get user from token subject
+
+    // validate the user
+    return getAuthentication(claim.getSubject());
   }
 
-  public String resolveToken(HttpServletRequest request) {
-    logger.info("Class name {} Path {}", request.getClass().getName(), request.getRequestURI());
-    var headerToken = request.getHeader("authorization");
-    if (headerToken == null || !headerToken.startsWith("Bearer")) {
-      logger.error("Missing user token");
-      return null;
-    }
-    return headerToken.substring(7);
-  }
-
-  public boolean isValid(String token) {
+  private Claims getClaims(String token) throws AuthenticationFailureException {
     try {
-      Jws<Claims> claim = Jwts.parser().setSigningKey(key).parseClaimsJws(token);
-      var expiryDAte = claim.getBody().getExpiration();
-      logger.info("token is expire {}", expiryDAte.before(new Date()));
-      return expiryDAte.before(new Date());
-
-    } catch (SignatureException e) {
-      logger.error("Invalid token");
-    } catch (ExpiredJwtException e) {
-      logger.error("Token has expired");
+      return Jwts.parser().setSigningKey(key).parseClaimsJws(token).getBody();
+    } catch (SignatureException
+        | MalformedJwtException
+        | UnsupportedJwtException
+        | IllegalArgumentException ex) {
+      throw new AuthenticationFailureException("Invalid Token");
+    } catch (ExpiredJwtException ex) {
+      throw new AuthenticationFailureException("Token has expired");
     }
-    return false;
+  }
+
+  private void isValid(Date expiryDate) throws AuthenticationFailureException {
+
+    if (expiryDate.before(new Date())) {
+      throw new AuthenticationFailureException("Token as expired");
+    }
   }
 
   public UsernamePasswordAuthenticationToken getAuthentication(String token) {
     // get username from token
     String userNameFromToken = getUserNameFromToken(token);
-    logger.info("Username: {}", userNameFromToken);
     var userDetails = userService.loadUserByUsername(userNameFromToken);
     if (userDetails == null) {
       logger.error("invalid token {}", token);
@@ -78,6 +77,10 @@ public class JwtTokenProvider {
     }
 
     return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+  }
+
+  public String createRefreshToken(String username) {
+    return creatToken(username, REFRESH_TOKEN_EXPIRY_TIME);
   }
 
   private String getUserNameFromToken(String token) {
@@ -90,7 +93,15 @@ public class JwtTokenProvider {
     }
   }
 
-  public String createRefreshToken(String username) {
-    return creatToken(username, REFRESH_TOKEN_EXPIRY_TIME);
+  private String creatToken(String username, long expirenIn) {
+    return Jwts.builder()
+        .signWith(SignatureAlgorithm.HS256, key)
+        .setIssuedAt(Date.from(Instant.now()))
+        .setExpiration(Date.from(Instant.now().plusSeconds(expirenIn)))
+        .setIssuer("weout-api")
+        .setAudience("weout-app")
+        .setHeaderParam("type", "JWT")
+        .setSubject(username)
+        .compact();
   }
 }
